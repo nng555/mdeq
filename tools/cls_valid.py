@@ -56,7 +56,6 @@ def parse_args():
                         help='percentage of training data to use',
                         type=float,
                         default=1.0)
-    parser.add_argument("--local_rank", type=int, default=0)
     parser.add_argument('opts',
                         help="Modify config options using the command-line",
                         default=None,
@@ -105,7 +104,7 @@ def main():
     criterion = torch.nn.CrossEntropyLoss().cuda()
 
     # Data loading code
-    valdir = os.path.join(config.DATASET.ROOT,
+    valdir = os.path.join(config.DATASET.ROOT+'/images',
                           config.DATASET.TEST_SET)
     normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                      std=[0.229, 0.224, 0.225])
@@ -124,8 +123,8 @@ def main():
     )
 
     # evaluate on validation set
-    validate(config, valid_loader, model, criterion, final_output_dir,
-             tb_log_dir, None)
+    validate(config, valid_loader, model, criterion, None, -1,
+             final_output_dir, tb_log_dir, None, topk=(1,5))
 
 
 if __name__ == '__main__':

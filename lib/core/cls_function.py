@@ -101,13 +101,9 @@ def validate(config, val_loader, model, criterion, output_dir, tb_log_dir,
         end = time.time()
         for i, (input, target) in enumerate(val_loader):
             # compute output
-            if writer_dict:
-                output = model(input,
-                               train_step=-1,       # Evaluate using MDEQ (even when pre-training)
-                               writer=writer_dict['writer'])
-            else:
-                output = model(input,
-                               train_step=-1)       # Evaluate using MDEQ (even when pre-training)
+            output = model(input,
+                           train_step=-1,       # Evaluate using MDEQ (even when pre-training)
+                           writer=None if writer_dict is None else writer_dict['writer'])
             target = target.cuda(non_blocking=True)
 
             loss = criterion(output, target)
