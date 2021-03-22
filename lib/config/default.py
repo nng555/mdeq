@@ -171,10 +171,10 @@ def update_config(cfg, args):
 
     if args.testModel:
         cfg.TEST.MODEL_FILE = args.testModel
-    
+
     if args.percent < 1:
         cfg.PERCENT = args.percent
-        
+
     cfg.merge_from_list(args.opts)
 
     cfg.freeze()

@@ -1,0 +1,15 @@
+#!/bin/bash
+#SBATCH --job-name=mdeq_val
+#SBATCH --output=/h/nng/slurm/2021-02-16/mdeq_val/log/%j.out
+#SBATCH --error=/h/nng/slurm/2021-02-16/mdeq_val/log/%j.err
+#SBATCH --open-mode=append
+#SBATCH --partition=rtx6000,t4v2,t4v1
+#SBATCH --cpus-per-task=4
+#SBATCH --ntasks-per-node=1
+#SBATCH --mem=22G
+#SBATCH --gres=gpu:1
+#SBATCH --nodes=1
+#SBATCH --qos=normal
+
+bash example_job.sh
+

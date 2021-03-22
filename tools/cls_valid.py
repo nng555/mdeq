@@ -30,7 +30,7 @@ from utils.utils import create_logger
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Train keypoints network')
-    
+
     parser.add_argument('--cfg',
                         help='experiment configure file name',
                         required=True,
@@ -52,6 +52,15 @@ def parse_args():
                         help='testModel',
                         type=str,
                         default='')
+    parser.add_argument('--percent',
+                        help='percentage of training data to use',
+                        type=float,
+                        default=1.0)
+    parser.add_argument("--local_rank", type=int, default=0)
+    parser.add_argument('opts',
+                        help="Modify config options using the command-line",
+                        default=None,
+                        nargs=argparse.REMAINDER)
 
     args = parser.parse_args()
     update_config(config, args)
