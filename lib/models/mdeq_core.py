@@ -408,6 +408,8 @@ class MDEQNet(nn.Module):
         self.f_thres = cfg['MODEL']['F_THRES']
         self.b_thres = cfg['MODEL']['B_THRES']
         self.num_classes = cfg['MODEL']['NUM_CLASSES']
+        self.emb = cfg['CONTRASTIVE']['EMB_SIZE']
+        self.is_encoder = cfg['CONTRASTIVE']['IS_CONTRASTIVE']
         self.downsample_times = cfg['MODEL']['DOWNSAMPLE_TIMES']
         self.pretrain_steps = cfg['TRAIN']['PRETRAIN_STEPS']
         DEQ_EXPAND = cfg['MODEL']['EXPANSION_FACTOR']

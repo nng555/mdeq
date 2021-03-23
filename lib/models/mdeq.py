@@ -84,7 +84,7 @@ class MDEQClsNet(MDEQNet):
 
         # Classification Head
         self.incre_modules, self.downsamp_modules, self.final_layer = self._make_head(self.num_channels)
-        self.classifier = nn.Linear(self.final_chansize, self.num_classes)
+        self.classifier = nn.Linear(self.final_chansize, self.emb if self.is_encoder else self.num_classes)
 
     def _make_head(self, pre_stage_channels):
         """
