@@ -18,6 +18,7 @@ import torch.optim
 import torch.utils.data
 import torch.utils.data.distributed
 import torchvision.datasets as datasets
+from torchvision.datasets.cifar import C10
 import torchvision.transforms as transforms
 from torch.utils.tensorboard import SummaryWriter
 
@@ -31,6 +32,8 @@ from utils.utils import get_optimizer
 from utils.utils import save_checkpoint
 from utils.utils import create_logger
 from termcolor import colored
+
+from datasets import CIFAR10
 
 
 def parse_args():
@@ -112,7 +115,7 @@ def main():
 
     gpus = list(config.GPUS)
     model = nn.DataParallel(model, device_ids=gpus).cuda()
-    print("Finished constructing model!")
+    print("Finished constructing encoder!")
 
     # define loss function (criterion) and optimizer
     criterion = nn.CrossEntropyLoss().cuda()
@@ -178,8 +181,8 @@ def main():
             transforms.ToTensor(),
             normalize,
         ])
-        train_dataset = datasets.CIFAR10(root=f'{config.DATASET.ROOT}', train=True, download=True, transform=transform_train)
-        valid_dataset = datasets.CIFAR10(root=f'{config.DATASET.ROOT}', train=False, download=True, transform=transform_valid)
+        train_dataset = datasets.C10(root=f'{config.DATASET.ROOT}', train=True, download=True, transform=transform_train)
+        valid_dataset = datasets.C10(root=f'{config.DATASET.ROOT}', train=False, download=True, transform=transform_valid)
         
     train_loader = torch.utils.data.DataLoader(
         train_dataset,
@@ -195,7 +198,18 @@ def main():
         num_workers=config.WORKERS,
         pin_memory=True
     )
+
+    # contrastive 
+    if config.CONTRASTIVE.IS_CONTRASTIVE and dataset_name == 'cifar10':
+        ds = CIFAR10(config.TRAIN.BATCH_SIZE_PER_GPU*len(gpus), config.DATASET.AUGMENTATIONS, config.WORKERS, 
+                        config.CLF.BATCH_SIZE_PER_GPU*len(gpus), config.TEST.BATCH_SIZE_PER_GPU*len(gpus))
+        train_loader = ds.train
+        clf_loader = ds.clf
+        valid_loader = ds.test
+        criterion = nn.Identity().cuda()
     
+    # TODO: change training
+
     # Learning rate scheduler
     if lr_scheduler is None:
         if config.TRAIN.LR_SCHEDULER != 'step':
