@@ -4,3 +4,4 @@ from __future__ import print_function
 
 import models.mdeq
 import models.mdeq_core
+import models.simclr

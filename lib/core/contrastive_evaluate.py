@@ -63,6 +63,9 @@ def eval_sgd(x_train, y_train, x_test, y_test, topk=[1, 5], epoch=500):
     del clf
     return acc
 
+
+
+
 """
 class ContrastiveBaseMethod(nn.Module):
 
@@ -100,3 +103,4 @@ class ContrastiveBaseMethod(nn.Module):
     def step(self, progress):
         pass
 """
+

@@ -84,7 +84,7 @@ class MDEQClsNet(MDEQNet):
 
         # Classification Head
         self.incre_modules, self.downsamp_modules, self.final_layer = self._make_head(self.num_channels)
-        self.classifier = nn.Linear(self.final_chansize, self.emb if self.is_encoder else self.num_classes)
+        self.classifier = nn.Linear(self.final_chansize, self.num_classes)
 
     def _make_head(self, pre_stage_channels):
         """
@@ -144,21 +144,27 @@ class MDEQClsNet(MDEQNet):
         y_list = self._forward(x, train_step, **kwargs)
 
         print(y_list, flush=True)
+        for y in y_list:
+            print(y.size(), flush=True)
 
         # Classification Head
         y = self.incre_modules[0](y_list[0])
+        print(y.size(), flush=True)
         for i in range(len(self.downsamp_modules)):
             y = self.incre_modules[i+1](y_list[i+1]) + self.downsamp_modules[i](y)
+            print(y.size(), flush=True)
         y = self.final_layer(y)
+        print(y.size(), flush=True)
 
         # Pool to a 1x1 vector (if needed)
         if torch._C._get_tracing_state():
             y = y.flatten(start_dim=2).mean(dim=2)
         else:
             y = F.avg_pool2d(y, kernel_size=y.size()[2:]).view(y.size(0), -1)
+        print(y.size(), flush=True)
         y = self.classifier(y)
 
-        print(y, flush=True)
+        #print(y, flush=True)
 
         return y
 

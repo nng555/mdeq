@@ -408,8 +408,6 @@ class MDEQNet(nn.Module):
         self.f_thres = cfg['MODEL']['F_THRES']
         self.b_thres = cfg['MODEL']['B_THRES']
         self.num_classes = cfg['MODEL']['NUM_CLASSES']
-        self.emb = cfg['CONTRASTIVE']['EMB_SIZE']
-        self.is_encoder = cfg['CONTRASTIVE']['IS_CONTRASTIVE']
         self.downsample_times = cfg['MODEL']['DOWNSAMPLE_TIMES']
         self.pretrain_steps = cfg['TRAIN']['PRETRAIN_STEPS']
         DEQ_EXPAND = cfg['MODEL']['EXPANSION_FACTOR']
@@ -446,8 +444,8 @@ class MDEQNet(nn.Module):
             x_list.append(torch.zeros(bsz, self.num_channels[i], H//2, W//2).to(dev))   # ... and the rest are all zeros
 
         # change this to change equilibria?
-        z_list = [torch.randn_like(elem) for elem in x_list]
-        #z_list = [torch.ones_like(elem) for elem in x_list]
+        #z_list = [torch.randn_like(elem) for elem in x_list]
+        z_list = [torch.zeros_like(elem) for elem in x_list]
 
         # For variational dropout mask resetting and weight normalization re-computations
         self.fullstage._reset(z_list)

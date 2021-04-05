@@ -1,4 +1,4 @@
-GPUS: (0,1)
+GPUS: (0,)
 LOG_DIR: 'log/'
 DATA_DIR: ''
 OUTPUT_DIR: 'output/'
@@ -8,14 +8,17 @@ PRINT_FREQ: 100
 CONTRASTIVE: 
   IS_CONTRASTIVE: true
   EMB_SIZE: 64
-  REPR_SIZE: 1024
+  REPR_SIZE: 6144
   NUM_SAMPLES: 2
   EVAL_HEAD: false
+  TAU: 0.1
+  NORMALIZE: true
   HEAD:
     LAYERS: 2
     SIZE: 512
+    ADD_BN: true
 MODEL: 
-  NAME: mdeq
+  NAME: simclr
   NUM_LAYERS: 10
   NUM_CLASSES: 10
   NUM_GROUPS: 8

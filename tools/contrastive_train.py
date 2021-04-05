@@ -25,7 +25,9 @@ import _init_paths
 import models
 from config import config
 from config import update_config
-from core.cls_function import train, validate
+from core.contrastive_function import train, validate
+from core.contrastive_criterion import NTXent, InfoNCE
+from datasets.transforms import aug_transform, base_transform, MultiSample
 from utils.modelsummary import get_model_summary
 from utils.utils import get_optimizer
 from utils.utils import save_checkpoint
@@ -85,10 +87,13 @@ def main():
 
     # cudnn related setting
     cudnn.benchmark = config.CUDNN.BENCHMARK
-    torch.backends.cudnn.deterministic = config.CUDNN.DETERMINISTIC
-    torch.backends.cudnn.enabled = config.CUDNN.ENABLED
+    cudnn.deterministic = config.CUDNN.DETERMINISTIC
+    cudnn.enabled = config.CUDNN.ENABLED
+    gpus = list(config.GPUS)
+    distributed = len(gpus) > 1
+    #device = torch.device('cuda:{}'.format(args.local_rank))
 
-    model = eval('models.'+config.MODEL.NAME+'.get_cls_net')(config).cuda()
+    model = eval('models.'+config.MODEL.NAME+'.get_contrastive_net')(config).cuda()
 
     dump_input = torch.rand(config.TRAIN.BATCH_SIZE_PER_GPU, 3, config.MODEL.IMAGE_SIZE[1], config.MODEL.IMAGE_SIZE[0]).cuda()
     logger.info(get_model_summary(model, dump_input))
@@ -97,6 +102,7 @@ def main():
         model.load_state_dict(torch.load(config.TRAIN.MODEL_FILE))
         logger.info(colored('=> loading model from {}'.format(config.TRAIN.MODEL_FILE), 'red'))
 
+    #if args.local_rank == 0:
     # copy model file
     this_dir = os.path.dirname(__file__)
     models_dst_dir = os.path.join(final_output_dir, 'models')
@@ -104,6 +110,15 @@ def main():
         shutil.rmtree(models_dst_dir)
     shutil.copytree(os.path.join(this_dir, '../lib/models'), models_dst_dir)
 
+    """
+    if distributed:
+        torch.cuda.set_device(args.local_rank)
+        torch.distributed.init_process_group(
+            backend="nccl", init_method="env://",
+        )
+    """
+
+    torch.cuda.empty_cache()
     writer_dict = {
         'writer': SummaryWriter(log_dir=tb_log_dir),
         'train_global_steps': 0,
@@ -112,11 +127,11 @@ def main():
 
     gpus = list(config.GPUS)
     model = nn.DataParallel(model, device_ids=gpus).cuda()
-    print("Finished constructing model!")
+    print("Finished constructing encoder!")
 
     # define loss function (criterion) and optimizer
-    criterion = nn.CrossEntropyLoss().cuda()
-
+    info_nce = InfoNCE(config.CONTRASTIVE.TAU, config.CONTRASTIVE.NORMALIZE, config.CONTRASTIVE.NUM_SAMPLES)
+    criterion = torch.nn.CrossEntropyLoss()
     optimizer = get_optimizer(config, model)
     lr_scheduler = None
 
@@ -147,6 +162,8 @@ def main():
     dataset_name = config.DATASET.DATASET
 
     if dataset_name == 'imagenet':
+        # implement imagenet later, this is not supported right now
+        """
         traindir = os.path.join(config.DATASET.ROOT+'/images', config.DATASET.TRAIN_SET)
         valdir = os.path.join(config.DATASET.ROOT+'/images', config.DATASET.TEST_SET)
         normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
@@ -164,20 +181,19 @@ def main():
         ])
         train_dataset = datasets.ImageFolder(traindir, transform_train)
         valid_dataset = datasets.ImageFolder(valdir, transform_valid)
+        """
     else:
+        # only cifar10 runs right now
         assert dataset_name == "cifar10", "Only CIFAR-10 is supported at this phase"
         classes = ('plane', 'car', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck')  # For reference
 
-        normalize = transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))
-        augment_list = [transforms.RandomCrop(32, padding=4), transforms.RandomHorizontalFlip()] if config.DATASET.AUGMENT else []
-        transform_train = transforms.Compose(augment_list + [
-            transforms.ToTensor(),
-            normalize,
-        ])
-        transform_valid = transforms.Compose([
-            transforms.ToTensor(),
-            normalize,
-        ])
+        # train transform should build contrastive batch
+        transform_train = MultiSample(
+            aug_transform(32, base_transform(), config['DATASET']['AUGMENTATIONS']),
+            n=config['CONTRASTIVE']['NUM_SAMPLES']
+        )
+        transform_valid = base_transform()
+
         train_dataset = datasets.CIFAR10(root=f'{config.DATASET.ROOT}', train=True, download=True, transform=transform_train)
         valid_dataset = datasets.CIFAR10(root=f'{config.DATASET.ROOT}', train=False, download=True, transform=transform_valid)
 
@@ -217,13 +233,13 @@ def main():
             lr_scheduler.step()
 
         # train for one epoch
-        train(config, train_loader, model, criterion, optimizer, lr_scheduler, epoch,
-              final_output_dir, tb_log_dir, writer_dict, topk=topk)
+        train(config, train_loader, model, info_nce, criterion, optimizer, lr_scheduler, epoch,
+              final_output_dir, tb_log_dir)
         torch.cuda.empty_cache()
 
         # evaluate on validation set
         perf_indicator = validate(config, valid_loader, model, criterion, lr_scheduler, epoch,
-                                  final_output_dir, tb_log_dir, writer_dict, topk=topk)
+                                  final_output_dir, tb_log_dir)
         torch.cuda.empty_cache()
         writer_dict['writer'].flush()
 
@@ -253,3 +269,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+

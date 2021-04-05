@@ -17,10 +17,14 @@ def aug_transform(crop, base_transform, cfg, extra_t=[]):
             ),
             T.RandomHorizontalFlip(p=cfg['hf_p']),
             *extra_t,
-            base_transform(),
+            base_transform,
         ]
     )
 
+def base_transform():
+    return T.Compose(
+        [T.ToTensor(), T.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))]
+    )
 
 class MultiSample:
     """ generates n samples with augmentation """
@@ -30,4 +34,4 @@ class MultiSample:
         self.num = n
 
     def __call__(self, x):
-        return tuple(self.transform(x) for _ in range(self.num))
+        return [self.transform(x) for _ in range(self.num)]
