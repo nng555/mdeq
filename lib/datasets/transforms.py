@@ -21,9 +21,9 @@ def aug_transform(crop, base_transform, cfg, extra_t=[]):
         ]
     )
 
-def base_transform():
+def base_transform(n1=(0.4914, 0.4822, 0.4465), n2=(0.2023, 0.1994, 0.2010)):
     return T.Compose(
-        [T.ToTensor(), T.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))]
+        [T.ToTensor(), T.Normalize(n1, n2)]
     )
 
 class MultiSample:

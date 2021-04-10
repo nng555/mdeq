@@ -1,7 +1,7 @@
 #!/bin/bash
-#SBATCH --job-name=mdeq_val
-#SBATCH --output=/h/nng/slurm/2021-02-16/mdeq_val/log/%j.out
-#SBATCH --error=/h/nng/slurm/2021-02-16/mdeq_val/log/%j.err
+#SBATCH --job-name=cls_valid
+#SBATCH --output=/h/nng/slurm/2021-02-16/cls_valid/log/%j.out
+#SBATCH --error=/h/nng/slurm/2021-02-16/cls_valid/log/%j.err
 #SBATCH --open-mode=append
 #SBATCH --partition=t4v1,p100
 #SBATCH --cpus-per-task=4
@@ -12,5 +12,5 @@
 #SBATCH --qos=legacy
 #SBATCH --account=legacy
 
-bash example_job.sh
+bash cls_valid.sh
 

@@ -19,6 +19,11 @@ import torch.utils.data.distributed
 import torchvision.datasets as datasets
 import torchvision.transforms as transforms
 
+import numpy as np
+import matplotlib.pyplot as plt
+from sklearn.manifold import TSNE
+from sklearn.decomposition import PCA
+
 import _init_paths
 import models
 from config import config
@@ -92,10 +97,7 @@ def main():
     torch.backends.cudnn.deterministic = config.CUDNN.DETERMINISTIC
     torch.backends.cudnn.enabled = config.CUDNN.ENABLED
 
-    if config.MODEL.DOWNSAMPLE:
-        model = eval('models.'+config.MODEL.NAME+'.get_cls_net')(config).cuda()
-    else:
-        model = eval('models.'+config.MODEL.NAME+'.get_linear_net')(config).cuda()
+    model = eval('models.'+config.MODEL.NAME+'.get_contrastive_net')(config).cuda()
 
     dump_input = torch.rand(
         (1, 3, config.MODEL.IMAGE_SIZE[1], config.MODEL.IMAGE_SIZE[0])
@@ -158,10 +160,36 @@ def main():
             pin_memory=True
         )
 
-    # evaluate on validation set
-    validate(config, valid_loader, model, criterion, None, -1,
-             final_output_dir, tb_log_dir, None, topk=(1,5))
+    model.eval()
 
+    embs = []
+    targets = []
+
+    with torch.no_grad():
+        for i, (input,target) in enumerate(valid_loader):
+            output = model(input, train_step=-1)[-1].cpu().numpy()
+            embs.extend(output)
+            targets.extend(target.cpu().numpy())
+
+    embs = np.asarray(embs)
+    print(targets, flush=True)
+    targets = np.asarray(targets)
+
+    pca = PCA(n_components=64)
+    embs = pca.fit_transform(embs)
+
+    tsne = TSNE(n_components=2, random_state=0)
+
+    embs_2d = tsne.fit_transform(embs)
+    target_ids = range(10)
+
+    plt.figure(figsize=(10, 10))
+    colors = 'r', 'g', 'b', 'c', 'm', 'yellow', 'k', 'lime', 'orange', 'purple'
+    classes = ('plane', 'car', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck')  # For reference
+    for i, c, label in zip(target_ids, colors, classes):
+        plt.scatter(embs_2d[targets == i, 0], embs_2d[targets == i, 1], c=c, label=label)
+    plt.legend()
+    plt.savefig(os.path.join(final_output_dir, 'tsne.png'))
 
 if __name__ == '__main__':
     main()

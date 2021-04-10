@@ -71,6 +71,51 @@ class Bottleneck(nn.Module):
 
         return out
 
+class MDEQClsLinear(MDEQNet):
+    def __init__(self, cfg, **kwargs):
+        global BN_MOMENTUM
+        super(MDEQClsLinear, self).__init__(cfg, BN_MOMENTUM=BN_MOMENTUM, **kwargs)
+        self.head = nn.Linear(cfg.CONTRASTIVE.REPR_SIZE[-1], self.num_classes)
+        self.frozen = cfg.MODEL.FROZEN
+
+    def forward(self, x, train_step=0, **kwargs):
+        if self.frozen:
+            with torch.no_grad():
+                out = self._forward(x, train_step, **kwargs)
+        else:
+            out = self._forward(x, train_step, **kwargs)
+
+        out = out[-1]
+        out = out.flatten(start_dim=1)
+
+        out = self.head(out)
+        return out
+
+    def init_weights(self, pretrained='',):
+        """
+        Model initialization. If pretrained weights are specified, we load the weights.
+        """
+        logger.info('=> init weights from normal distribution')
+        for m in self.modules():
+            if isinstance(m, nn.Conv2d):
+                m.weight.data.normal_(0, 0.01)
+                if m.bias is not None:
+                    m.bias.data.normal_(0, 0.01)
+            elif isinstance(m, nn.BatchNorm2d) and m.weight is not None:
+                nn.init.constant_(m.weight, 1)
+                nn.init.constant_(m.bias, 0)
+        if os.path.isfile(pretrained):
+            pretrained_dict = torch.load(pretrained)
+            logger.info('=> loading pretrained model {}'.format(pretrained))
+            model_dict = self.state_dict()
+            pretrained_dict = {k: v for k, v in pretrained_dict.items()
+                               if k in model_dict.keys()}
+            for k, _ in pretrained_dict.items():
+                logger.info(
+                    '=> loading {} pretrained model {}'.format(k, pretrained))
+            model_dict.update(pretrained_dict)
+            self.load_state_dict(model_dict)
+
 
 class MDEQClsNet(MDEQNet):
     def __init__(self, cfg, **kwargs):
@@ -81,6 +126,7 @@ class MDEQClsNet(MDEQNet):
         super(MDEQClsNet, self).__init__(cfg, BN_MOMENTUM=BN_MOMENTUM, **kwargs)
         self.head_channels = cfg['MODEL']['EXTRA']['FULL_STAGE']['HEAD_CHANNELS']
         self.final_chansize = cfg['MODEL']['EXTRA']['FULL_STAGE']['FINAL_CHANSIZE']
+        self.frozen = cfg.MODEL.FROZEN
 
         # Classification Head
         self.incre_modules, self.downsamp_modules, self.final_layer = self._make_head(self.num_channels)
@@ -141,30 +187,27 @@ class MDEQClsNet(MDEQNet):
         return nn.Sequential(*layers)
 
     def forward(self, x, train_step=0, **kwargs):
-        y_list = self._forward(x, train_step, **kwargs)
 
-        print(y_list, flush=True)
-        for y in y_list:
-            print(y.size(), flush=True)
+        if self.frozen:
+            with torch.no_grad():
+                y_list = self._forward(x, train_step, **kwargs)
+        else:
+            y_list = self._forward(x, train_step, **kwargs)
+
+
 
         # Classification Head
         y = self.incre_modules[0](y_list[0])
-        print(y.size(), flush=True)
         for i in range(len(self.downsamp_modules)):
             y = self.incre_modules[i+1](y_list[i+1]) + self.downsamp_modules[i](y)
-            print(y.size(), flush=True)
         y = self.final_layer(y)
-        print(y.size(), flush=True)
 
         # Pool to a 1x1 vector (if needed)
         if torch._C._get_tracing_state():
             y = y.flatten(start_dim=2).mean(dim=2)
         else:
             y = F.avg_pool2d(y, kernel_size=y.size()[2:]).view(y.size(0), -1)
-        print(y.size(), flush=True)
         y = self.classifier(y)
-
-        #print(y, flush=True)
 
         return y
 
@@ -261,14 +304,19 @@ class MDEQSegNet(MDEQNet):
             model_dict.update(pretrained_dict)
             self.load_state_dict(model_dict)
 
+def get_linear_net(config, **kwargs):
+    global BN_MOMENTUM
+    BN_MOMENTUM = 0.1
+    model = MDEQClsLinear(config, **kwargs)
+    model.init_weights(config.MODEL.PRETRAINED)
+    return model
 
 def get_cls_net(config, **kwargs):
     global BN_MOMENTUM
     BN_MOMENTUM = 0.1
     model = MDEQClsNet(config, **kwargs)
-    model.init_weights()
+    model.init_weights(config.MODEL.PRETRAINED)
     return model
-
 
 def get_seg_net(config, **kwargs):
     global BN_MOMENTUM

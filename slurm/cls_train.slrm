@@ -1,0 +1,16 @@
+#!/bin/bash
+#SBATCH --job-name=clf_train
+#SBATCH --output=/h/nng/slurm/2021-02-16/clf_train/log/%j.out
+#SBATCH --error=/h/nng/slurm/2021-02-16/clf_train/log/%j.err
+#SBATCH --open-mode=append
+#SBATCH --partition=t4v1,p100
+#SBATCH --cpus-per-task=4
+#SBATCH --ntasks-per-node=1
+#SBATCH --mem=22G
+#SBATCH --gres=gpu:1
+#SBATCH --nodes=1
+#SBATCH --qos=legacy
+#SBATCH --account=legacy
+
+bash cls_train.sh
+

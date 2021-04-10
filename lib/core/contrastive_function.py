@@ -8,8 +8,8 @@ import time
 import logging
 
 import torch
+import numpy as np
 
-from core.cls_evaluate import accuracy
 from core.contrastive_criterion import InfoNCE
 
 
@@ -61,10 +61,18 @@ def train(config, train_loader, model, info_nce, criterion, optimizer, lr_schedu
         # stack to form 2N size batch
         imgs = torch.cat(imgs, dim=0)
 
-        features = model(imgs, train_step=(lr_scheduler._step_count-1))
+        featureList = model(imgs, train_step=(lr_scheduler._step_count-1), project=True)
 
-        logits, labels = info_nce(features)
-        loss = criterion(logits, labels)
+        logits_list = []
+        labels_list = []
+        loss_list = []
+        for features in featureList:
+            logits, labels = info_nce(features)
+            logits_list.append(logits)
+            labels_list.append(labels)
+            loss_list.append(criterion(logits, labels))
+
+        loss = torch.sum(torch.stack(loss_list))
 
         # compute gradient and do update step
         optimizer.zero_grad()
@@ -77,6 +85,10 @@ def train(config, train_loader, model, info_nce, criterion, optimizer, lr_schedu
 
         # measure accuracy and record loss
         losses.update(loss.item(), features.size(0))
+
+        topk = [accuracy(logits, labels, topk=(1, 5)) for logits, labels in zip(logits_list, labels_list)]
+        top1 = [val[0].item() for val in topk]
+        top5 = [val[1].item() for val in topk]
 
         #prec1, prec5 = accuracy(output, target, topk=topk)
 
@@ -92,12 +104,30 @@ def train(config, train_loader, model, info_nce, criterion, optimizer, lr_schedu
                   'Time {batch_time.val:.3f}s ({batch_time.avg:.3f}s)\t' \
                   'Speed {speed:.1f} samples/s\t' \
                   'Data {data_time.val:.3f}s ({data_time.avg:.3f}s)\t' \
-                  'Loss {loss.val:.5f} ({loss.avg:.5f})'.format(
+                  'Loss {loss.val:.5f} ({loss.avg:.5f})\t' \
+                  'accuracy@1 {top1} \t' \
+                  'accuracy@5 {top5} \t'.format(
                       epoch, i, effec_batch_num, batch_time=batch_time,
                       speed=features.size(0)/batch_time.val,
-                      data_time=data_time, loss=losses)
+                      data_time=data_time, loss=losses, top1=str(top1), top5=str(top5))
             logger.info(msg)
 
+
+def accuracy(output, target, topk=(1,)):
+    """Computes the accuracy over the k top predictions for the specified values of k"""
+    with torch.no_grad():
+        maxk = max(topk)
+        batch_size = target.size(0)
+
+        _, pred = output.topk(maxk, 1, True, True)
+        pred = pred.t()
+        correct = pred.eq(target.view(1, -1).expand_as(pred))
+
+        res = []
+        for k in topk:
+            correct_k = correct[:k].reshape(-1).float().sum(0, keepdim=True)
+            res.append(correct_k.mul_(100.0 / batch_size))
+        return res
 
 def validate(config, val_loader, model, criterion, output_dir, tb_log_dir,
              writer_dict=None, topk=(1,5)):
@@ -149,6 +179,7 @@ def validate(config, val_loader, model, criterion, output_dir, tb_log_dir,
             writer_dict['valid_global_steps'] = global_steps + 1
 
     return top1.avg
+
 
 def get_data(model, loader, output_size, device):
     """ encodes the whole dataset into embeddings """

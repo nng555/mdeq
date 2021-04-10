@@ -25,7 +25,7 @@ _C.RANK = 0
 _C.CONTRASTIVE = CN()
 _C.CONTRASTIVE.IS_CONTRASTIVE = True
 _C.CONTRASTIVE.EMB_SIZE = 64
-_C.CONTRASTIVE.REPR_SIZE = 1024
+_C.CONTRASTIVE.REPR_SIZE = [1024]
 _C.CONTRASTIVE.NUM_SAMPLES = 2
 _C.CONTRASTIVE.EVAL_HEAD = False
 _C.CONTRASTIVE.TAU = 0.1
@@ -43,6 +43,8 @@ _C.CUDNN.ENABLED = True
 
 # common params for NETWORK
 _C.MODEL = CN()
+_C.MODEL.FROZEN = False
+_C.MODEL.DOWNSAMPLE = False
 _C.MODEL.NAME = 'mdeq'       # Default for classification
 _C.MODEL.INIT_WEIGHTS = True
 _C.MODEL.WNORM = False
@@ -203,6 +205,25 @@ def update_config(cfg, args):
 
     if args.percent < 1:
         cfg.PERCENT = args.percent
+
+
+    extra = []
+    if args.frozen:
+        cfg.MODEL.FROZEN = args.frozen
+        extra.append('frozen')
+
+    if args.pretrained:
+        cfg.TEST.MODEL_FILE = args.pretrained
+        cfg.MODEL.PRETRAINED = args.pretrained
+        extra.append('pretrained')
+
+    if args.downsample:
+        cfg.MODEL.DOWNSAMPLE = args.downsample
+        extra.append('downsample')
+
+    if extra:
+        extra = '_'.join(extra)
+        cfg.OUTPUT_DIR += extra
 
     cfg.merge_from_list(args.opts)
 

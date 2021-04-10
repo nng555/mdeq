@@ -67,6 +67,14 @@ def parse_args():
                         help="Modify config options using the command-line",
                         default=None,
                         nargs=argparse.REMAINDER)
+    parser.add_argument('--frozen',
+                        help='whether to freeze the mdeq or not',
+                        action='store_true',
+                        default=False)
+    parser.add_argument('--pretrained',
+                        help='path to pretrained model',
+                        default=None,
+                        type=str)
 
     args = parser.parse_args()
     update_config(config, args)
@@ -163,29 +171,25 @@ def main():
 
     if dataset_name == 'imagenet':
         # implement imagenet later, this is not supported right now
-        """
-        traindir = os.path.join(config.DATASET.ROOT+'/images', config.DATASET.TRAIN_SET)
-        valdir = os.path.join(config.DATASET.ROOT+'/images', config.DATASET.TEST_SET)
+        traindir = os.path.join(config.DATASET.ROOT+'/', config.DATASET.TRAIN_SET)
+        valdir = os.path.join(config.DATASET.ROOT+'/', config.DATASET.TEST_SET)
         normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-        transform_train = transforms.Compose([
-            transforms.RandomResizedCrop(config.MODEL.IMAGE_SIZE[0]),
-            transforms.RandomHorizontalFlip(),
-            transforms.ToTensor(),
-            normalize,
-        ])
+        transform_train = MultiSample(
+            aug_transform(config.MODEL.IMAGE_SIZE[0], base_transform((0.485, 0.456, 0.406), (0.229, 0.224,0.225)), config.DATASET.AUGMENTATIONS),
+            n=config.CONTRASTIVE.NUM_SAMPLES
+        )
         transform_valid = transforms.Compose([
             transforms.Resize(int(config.MODEL.IMAGE_SIZE[0] / 0.875)),
             transforms.CenterCrop(config.MODEL.IMAGE_SIZE[0]),
-            transforms.ToTensor(),
-            normalize,
+            base_transform((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
         ])
+
         train_dataset = datasets.ImageFolder(traindir, transform_train)
         valid_dataset = datasets.ImageFolder(valdir, transform_valid)
-        """
     else:
         # only cifar10 runs right now
-        assert dataset_name == "cifar10", "Only CIFAR-10 is supported at this phase"
-        classes = ('plane', 'car', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck')  # For reference
+        #assert dataset_name == "cifar10", "Only CIFAR-10 is supported at this phase"
+        #classes = ('plane', 'car', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck')  # For reference
 
         # train transform should build contrastive batch
         transform_train = MultiSample(
@@ -193,9 +197,12 @@ def main():
             n=config['CONTRASTIVE']['NUM_SAMPLES']
         )
         transform_valid = base_transform()
-
-        train_dataset = datasets.CIFAR10(root=f'{config.DATASET.ROOT}', train=True, download=True, transform=transform_train)
-        valid_dataset = datasets.CIFAR10(root=f'{config.DATASET.ROOT}', train=False, download=True, transform=transform_valid)
+        if dataset_name == 'cifar10':
+            train_dataset = datasets.CIFAR10(root=f'{config.DATASET.ROOT}', train=True, download=True, transform=transform_train)
+            valid_dataset = datasets.CIFAR10(root=f'{config.DATASET.ROOT}', train=False, download=True, transform=transform_valid)
+        elif dataset_name == 'cifar100':
+            train_dataset = datasets.CIFAR100(root=f'{config.DATASET.ROOT}', train=True, download=True, transform=transform_train)
+            valid_dataset = datasets.CIFAR100(root=f'{config.DATASET.ROOT}', train=False, download=True, transform=transform_valid)
 
     train_loader = torch.utils.data.DataLoader(
         train_dataset,
@@ -238,23 +245,27 @@ def main():
         torch.cuda.empty_cache()
 
         # evaluate on validation set
-        perf_indicator = validate(config, valid_loader, model, criterion, lr_scheduler, epoch,
-                                  final_output_dir, tb_log_dir)
+        #perf_indicator = validate(config, valid_loader, model, criterion, lr_scheduler, epoch,
+                                  #final_output_dir, tb_log_dir)
         torch.cuda.empty_cache()
         writer_dict['writer'].flush()
 
+        """
         if perf_indicator > best_perf:
             best_perf = perf_indicator
             best_model = True
         else:
             best_model = False
+        """
+
+        best_model = True
 
         logger.info('=> saving checkpoint to {}'.format(final_output_dir))
         save_checkpoint({
             'epoch': epoch + 1,
             'model': config.MODEL.NAME,
             'state_dict': model.module.state_dict(),
-            'perf': perf_indicator,
+            #'perf': perf_indicator,
             'optimizer': optimizer.state_dict(),
             'lr_scheduler': lr_scheduler.state_dict(),
         }, best_model, final_output_dir, filename='checkpoint.pth.tar')

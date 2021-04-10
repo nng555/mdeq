@@ -87,7 +87,7 @@ def train(config, train_loader, model, criterion, optimizer, lr_scheduler, epoch
                 writer_dict['train_global_steps'] = global_steps + 1
 
 
-def validate(config, val_loader, model, criterion, output_dir, tb_log_dir,
+def validate(config, val_loader, model, criterion, lr_scheduler, epoch, output_dir, tb_log_dir,
              writer_dict=None, topk=(1,5)):
     batch_time = AverageMeter()
     losses = AverageMeter()
@@ -117,7 +117,6 @@ def validate(config, val_loader, model, criterion, output_dir, tb_log_dir,
             # measure elapsed time
             batch_time.update(time.time() - end)
             end = time.time()
-            break
 
         msg = 'Test: Time {batch_time.avg:.3f}\t' \
               'Loss {loss.avg:.4f}\t' \

@@ -65,6 +65,18 @@ def parse_args():
                         help="Modify config options using the command-line",
                         default=None,
                         nargs=argparse.REMAINDER)
+    parser.add_argument('--frozen',
+                        help='whether to freeze the mdeq or not',
+                        action='store_true',
+                        default=False)
+    parser.add_argument('--pretrained',
+                        help='path to pretrained model',
+                        default=None,
+                        type=str)
+    parser.add_argument('--downsample',
+                        help='whether to use a linear classification head',
+                        action='store_true',
+                        default=False)
 
     args = parser.parse_args()
     update_config(config, args)
@@ -88,7 +100,10 @@ def main():
     torch.backends.cudnn.deterministic = config.CUDNN.DETERMINISTIC
     torch.backends.cudnn.enabled = config.CUDNN.ENABLED
 
-    model = eval('models.'+config.MODEL.NAME+'.get_cls_net')(config).cuda()
+    if config.MODEL.DOWNSAMPLE:
+        model = eval('models.'+config.MODEL.NAME+'.get_cls_net')(config).cuda()
+    else:
+        model = eval('models.'+config.MODEL.NAME+'.get_linear_net')(config).cuda()
 
     dump_input = torch.rand(config.TRAIN.BATCH_SIZE_PER_GPU, 3, config.MODEL.IMAGE_SIZE[1], config.MODEL.IMAGE_SIZE[0]).cuda()
     logger.info(get_model_summary(model, dump_input))
@@ -146,6 +161,7 @@ def main():
     # Data loading code
     dataset_name = config.DATASET.DATASET
 
+
     if dataset_name == 'imagenet':
         traindir = os.path.join(config.DATASET.ROOT+'/images', config.DATASET.TRAIN_SET)
         valdir = os.path.join(config.DATASET.ROOT+'/images', config.DATASET.TEST_SET)
@@ -165,8 +181,8 @@ def main():
         train_dataset = datasets.ImageFolder(traindir, transform_train)
         valid_dataset = datasets.ImageFolder(valdir, transform_valid)
     else:
-        assert dataset_name == "cifar10", "Only CIFAR-10 is supported at this phase"
-        classes = ('plane', 'car', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck')  # For reference
+        #assert dataset_name == "cifar10", "Only CIFAR-10 is supported at this phase"
+        #classes = ('plane', 'car', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck')  # For reference
 
         normalize = transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))
         augment_list = [transforms.RandomCrop(32, padding=4), transforms.RandomHorizontalFlip()] if config.DATASET.AUGMENT else []
@@ -178,8 +194,12 @@ def main():
             transforms.ToTensor(),
             normalize,
         ])
-        train_dataset = datasets.CIFAR10(root=f'{config.DATASET.ROOT}', train=True, download=True, transform=transform_train)
-        valid_dataset = datasets.CIFAR10(root=f'{config.DATASET.ROOT}', train=False, download=True, transform=transform_valid)
+        if dataset_name == 'cifar10':
+            train_dataset = datasets.CIFAR10(root=f'{config.DATASET.ROOT}', train=True, download=True, transform=transform_train)
+            valid_dataset = datasets.CIFAR10(root=f'{config.DATASET.ROOT}', train=False, download=True, transform=transform_valid)
+        elif dataset_name == 'cifar100':
+            train_dataset = datasets.CIFAR100(root=f'{config.DATASET.ROOT}', train=True, download=True, transform=transform_train)
+            valid_dataset = datasets.CIFAR100(root=f'{config.DATASET.ROOT}', train=False, download=True, transform=transform_valid)
 
     train_loader = torch.utils.data.DataLoader(
         train_dataset,
